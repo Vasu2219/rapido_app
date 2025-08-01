@@ -188,7 +188,142 @@ class ApiService {
       return false;
     }
   }
+
+  // Admin Methods
   
+  // Get all rides for admin
+  Future<List<Ride>> getAdminRides({String? status}) async {
+    try {
+      String endpoint = '$baseUrl/api/admin/rides';
+      if (status != null && status.isNotEmpty && status != 'All') {
+        endpoint += '?status=${status.toLowerCase()}';
+      }
+      
+      print('🔍 Getting admin rides from: $endpoint');
+      
+      final response = await http.get(
+        Uri.parse(endpoint),
+        headers: await _getHeaders(),
+      );
+      
+      print('📊 Admin rides response status: ${response.statusCode}');
+      print('📝 Admin rides response body: ${response.body}');
+      
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200 && data['success'] == true) {
+        final rides = data['data']['rides'] as List;
+        print('✅ Retrieved ${rides.length} admin rides');
+        return rides.map((ride) => Ride.fromJson(ride)).toList();
+      } else {
+        throw Exception(data['message'] ?? 'Failed to get admin rides');
+      }
+    } catch (e) {
+      print('💥 Error getting admin rides: $e');
+      rethrow;
+    }
+  }
+
+  // Approve ride
+  Future<Map<String, dynamic>> approveRide(String rideId, {String? comments}) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/admin/rides/$rideId/approve'),
+        headers: await _getHeaders(),
+        body: jsonEncode({
+          'comments': comments ?? '',
+        }),
+      );
+      
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200 && data['success'] == true) {
+        return data;
+      } else {
+        throw Exception(data['message'] ?? 'Failed to approve ride');
+      }
+    } catch (e) {
+      print('💥 Error approving ride: $e');
+      rethrow;
+    }
+  }
+
+  // Reject ride
+  Future<Map<String, dynamic>> rejectRide(String rideId, {String? reason, String? comments}) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/admin/rides/$rideId/reject'),
+        headers: await _getHeaders(),
+        body: jsonEncode({
+          'reason': reason ?? 'Not approved',
+          'comments': comments ?? '',
+        }),
+      );
+      
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200 && data['success'] == true) {
+        return data;
+      } else {
+        throw Exception(data['message'] ?? 'Failed to reject ride');
+      }
+    } catch (e) {
+      print('💥 Error rejecting ride: $e');
+      rethrow;
+    }
+  }
+
+  // Get admin notification count
+  Future<int> getAdminNotificationCount() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/notifications/admin/count'),
+        headers: await _getHeaders(),
+      );
+      
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200 && data['success'] == true) {
+        return data['data']['pendingRides'] ?? 0;
+      } else {
+        return 0;
+      }
+    } catch (e) {
+      print('💥 Error getting notification count: $e');
+      return 0;
+    }
+  }
+
+  // Cancel ride
+  Future<Map<String, dynamic>> cancelRide(String rideId, {String? reason}) async {
+    try {
+      print('🚫 Canceling ride: $rideId');
+      
+      final response = await http.delete(
+        Uri.parse('$baseUrl/api/rides/$rideId'),
+        headers: await _getHeaders(),
+        body: jsonEncode({
+          'cancellationReason': reason ?? 'User cancelled',
+        }),
+      );
+      
+      print('📊 Cancel ride response status: ${response.statusCode}');
+      print('📝 Cancel ride response body: ${response.body}');
+      
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200 && data['success'] == true) {
+        print('✅ Ride cancelled successfully');
+        return data;
+      } else {
+        throw Exception(data['message'] ?? 'Failed to cancel ride');
+      }
+    } catch (e) {
+      print('💥 Error canceling ride: $e');
+      rethrow;
+    }
+  }
+
   // Logout
   Future<void> logout() async {
     await storage.delete(key: 'auth_token');

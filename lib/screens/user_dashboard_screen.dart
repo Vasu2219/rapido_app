@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rapido_app/providers/auth_provider.dart';
@@ -15,6 +16,7 @@ class UserDashboardScreen extends StatefulWidget {
 class _UserDashboardScreenState extends State<UserDashboardScreen> {
   int _currentIndex = 0;
   final TextEditingController _searchController = TextEditingController();
+  Timer? _autoRefreshTimer;
 
   @override
   void initState() {
@@ -23,11 +25,19 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<RideProvider>(context, listen: false).getUserRides();
     });
+    
+    // Set up auto-refresh timer for every 30 seconds
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (mounted) {
+        Provider.of<RideProvider>(context, listen: false).getUserRides();
+      }
+    });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _autoRefreshTimer?.cancel();
     super.dispose();
   }
 
@@ -319,7 +329,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                   ],
                 ),
               )
-            else if (rideProvider.rides.isEmpty)
+            else if (rideProvider.allRides.isEmpty)
               Center(
                 child: Column(
                   children: [
@@ -348,9 +358,9 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
               ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: rideProvider.rides.length > 3 ? 3 : rideProvider.rides.length,
+                itemCount: rideProvider.allRides.length > 3 ? 3 : rideProvider.allRides.length,
                 itemBuilder: (context, index) {
-                  final ride = rideProvider.rides[index];
+                  final ride = rideProvider.allRides[index];
                   return Card(
                     margin: const EdgeInsets.only(bottom: 12),
                     child: ListTile(
@@ -399,23 +409,11 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'My Rides',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              ElevatedButton.icon(
-                onPressed: () {
-                  rideProvider.getUserRides();
-                },
-                icon: const Icon(Icons.refresh),
-                label: const Text('Refresh'),
-              ),
-            ],
+          Text(
+            'My Rides',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
 
           const SizedBox(height: 16),
@@ -425,29 +423,15 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                FilterChip(
-                  label: const Text('All'),
-                  selected: true,
-                  onSelected: (selected) {},
-                ),
+                _buildFilterChip('All', rideProvider),
                 const SizedBox(width: 8),
-                FilterChip(
-                  label: const Text('Pending'),
-                  selected: false,
-                  onSelected: (selected) {},
-                ),
+                _buildFilterChip('Pending', rideProvider),
                 const SizedBox(width: 8),
-                FilterChip(
-                  label: const Text('Approved'),
-                  selected: false,
-                  onSelected: (selected) {},
-                ),
+                _buildFilterChip('Approved', rideProvider),
                 const SizedBox(width: 8),
-                FilterChip(
-                  label: const Text('Completed'),
-                  selected: false,
-                  onSelected: (selected) {},
-                ),
+                _buildFilterChip('Completed', rideProvider),
+                const SizedBox(width: 8),
+                _buildFilterChip('Cancelled', rideProvider),
               ],
             ),
           ),
@@ -496,129 +480,224 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> {
                                 Icon(Icons.directions_car_outlined, size: 64, color: Colors.grey),
                                 const SizedBox(height: 16),
                                 Text(
-                                  'No rides found',
+                                  rideProvider.selectedFilter == 'All' 
+                                      ? 'No rides found'
+                                      : 'No ${rideProvider.selectedFilter.toLowerCase()} rides',
                                   style: TextStyle(
                                     fontSize: 18,
                                     color: Colors.grey.shade600,
                                   ),
                                 ),
                                 const SizedBox(height: 8),
-                                const Text(
-                                  'Book your first ride to get started!',
-                                  style: TextStyle(color: Colors.grey),
+                                Text(
+                                  rideProvider.selectedFilter == 'All'
+                                      ? 'Book your first ride to get started!'
+                                      : 'Try changing the filter or book a new ride.',
+                                  style: const TextStyle(color: Colors.grey),
                                 ),
-                                const SizedBox(height: 16),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => const BookRideScreen(),
-                                      ),
-                                    );
-                                  },
-                                  child: const Text('Book a Ride'),
-                                ),
+                                if (rideProvider.selectedFilter == 'All') ...[
+                                  const SizedBox(height: 16),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => const BookRideScreen(),
+                                        ),
+                                      );
+                                    },
+                                    child: const Text('Book a Ride'),
+                                  ),
+                                ],
                               ],
                             ),
                           )
-                        : ListView.builder(
-                            itemCount: rideProvider.rides.length,
-                            itemBuilder: (context, index) {
-                              final ride = rideProvider.rides[index];
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            'Ride #${ride.id.substring(ride.id.length - 6)}',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 6,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: _getStatusColor(ride.status).withOpacity(0.2),
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            child: Text(
-                                              ride.status.toUpperCase(),
-                                              style: TextStyle(
-                                                color: _getStatusColor(ride.status),
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Row(
-                                        children: [
-                                          Icon(Icons.my_location, size: 16, color: Colors.green),
-                                          const SizedBox(width: 8),
-                                          Expanded(child: Text(ride.pickupLocation)),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        children: [
-                                          Icon(Icons.location_on, size: 16, color: Colors.red),
-                                          const SizedBox(width: 8),
-                                          Expanded(child: Text(ride.dropLocation)),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        children: [
-                                          Icon(Icons.schedule, size: 16, color: Colors.grey),
-                                          const SizedBox(width: 8),
-                                          Text(ride.scheduledTime.toString().split('.')[0]),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            '₹${ride.estimatedFare.toStringAsFixed(0)}',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                          if (ride.status.toLowerCase() == 'pending')
-                                            TextButton(
-                                              onPressed: () {
-                                                // Cancel ride
-                                              },
-                                              style: TextButton.styleFrom(
-                                                foregroundColor: Colors.red,
-                                              ),
-                                              child: const Text('Cancel'),
-                                            ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
+                        : RefreshIndicator(
+                            onRefresh: () async {
+                              await rideProvider.getUserRides();
                             },
+                            child: ListView.builder(
+                              itemCount: rideProvider.rides.length,
+                              itemBuilder: (context, index) {
+                                final ride = rideProvider.rides[index];
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              'Ride #${ride.id.substring(ride.id.length - 6)}',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 6,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: _getStatusColor(ride.status).withOpacity(0.2),
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              child: Text(
+                                                ride.status.toUpperCase(),
+                                                style: TextStyle(
+                                                  color: _getStatusColor(ride.status),
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Row(
+                                          children: [
+                                            Icon(Icons.my_location, size: 16, color: Colors.green),
+                                            const SizedBox(width: 8),
+                                            Expanded(child: Text(ride.pickupLocation)),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            Icon(Icons.location_on, size: 16, color: Colors.red),
+                                            const SizedBox(width: 8),
+                                            Expanded(child: Text(ride.dropLocation)),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            Icon(Icons.schedule, size: 16, color: Colors.grey),
+                                            const SizedBox(width: 8),
+                                            Text(ride.scheduledTime.toString().split('.')[0]),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              '₹${ride.estimatedFare.toStringAsFixed(0)}',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                            if (ride.status.toLowerCase() == 'pending')
+                                              ElevatedButton(
+                                                onPressed: () => _showCancelDialog(ride.id),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: Colors.red,
+                                                  foregroundColor: Colors.white,
+                                                  padding: const EdgeInsets.symmetric(
+                                                    horizontal: 16,
+                                                    vertical: 8,
+                                                  ),
+                                                ),
+                                                child: const Text('Cancel'),
+                                              ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                           ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, RideProvider rideProvider) {
+    return FilterChip(
+      label: Text(label),
+      selected: rideProvider.selectedFilter == label,
+      onSelected: (selected) {
+        if (selected) {
+          rideProvider.setFilter(label);
+        }
+      },
+      selectedColor: Colors.blue.withOpacity(0.2),
+      checkmarkColor: Colors.blue,
+    );
+  }
+
+  void _showCancelDialog(String rideId) {
+    final TextEditingController reasonController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Cancel Ride'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Are you sure you want to cancel this ride?'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  labelText: 'Reason for cancellation (optional)',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 2,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('Keep Ride'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                
+                final rideProvider = Provider.of<RideProvider>(context, listen: false);
+                final success = await rideProvider.cancelRide(
+                  rideId,
+                  reason: reasonController.text.trim().isNotEmpty 
+                      ? reasonController.text.trim() 
+                      : null,
+                );
+                
+                if (success && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Ride cancelled successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } else if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(rideProvider.error ?? 'Failed to cancel ride'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('Cancel Ride', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
     );
   }
 

@@ -9,6 +9,7 @@ class Ride {
   final DateTime createdAt;
   final DateTime updatedAt;
   final Map<String, dynamic>? driver;
+  final Map<String, dynamic>? userDetails; // To store full user object if available
 
   // Getter for scheduleTime (alias for scheduledTime)
   DateTime get scheduleTime => scheduledTime;
@@ -24,15 +25,31 @@ class Ride {
     required this.createdAt,
     required this.updatedAt,
     this.driver,
+    this.userDetails,
   });
 
   // Factory constructor to create a Ride from JSON
   factory Ride.fromJson(Map<String, dynamic> json) {
+    // Handle userId - it can be either a string or an object
+    String userIdValue;
+    Map<String, dynamic>? userDetailsValue;
+    
+    if (json['userId'] is String) {
+      userIdValue = json['userId'];
+    } else if (json['userId'] is Map<String, dynamic>) {
+      final userObj = json['userId'] as Map<String, dynamic>;
+      userIdValue = userObj['_id'] ?? userObj['id'] ?? '';
+      userDetailsValue = userObj;
+    } else {
+      userIdValue = '';
+    }
+    
     return Ride(
-      id: json['_id'] ?? '',
-      userId: json['userId'] ?? '',
-      pickupLocation: json['pickupLocation'] ?? '',
-      dropLocation: json['dropLocation'] ?? '',
+      id: json['_id'] ?? json['id'] ?? '',
+      userId: userIdValue,
+      // Handle both old and new field names
+      pickupLocation: json['pickup'] ?? json['pickupLocation'] ?? '',
+      dropLocation: json['drop'] ?? json['dropLocation'] ?? '',
       scheduledTime: json['scheduledTime'] != null
           ? DateTime.parse(json['scheduledTime'])
           : json['scheduleTime'] != null
@@ -47,6 +64,7 @@ class Ride {
           ? DateTime.parse(json['updatedAt'])
           : DateTime.now(),
       driver: json['driver'],
+      userDetails: userDetailsValue,
     );
   }
 
@@ -55,9 +73,9 @@ class Ride {
     return {
       '_id': id,
       'userId': userId,
-      'pickupLocation': pickupLocation,
-      'dropLocation': dropLocation,
-      'scheduledTime': scheduledTime.toIso8601String(),
+      'pickup': pickupLocation, // Use backend field names
+      'drop': dropLocation, // Use backend field names
+      'scheduleTime': scheduledTime.toIso8601String(), // Use backend field name
       'status': status,
       'estimatedFare': estimatedFare,
       'createdAt': createdAt.toIso8601String(),

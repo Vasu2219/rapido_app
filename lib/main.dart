@@ -11,6 +11,7 @@ import 'package:rapido_app/navigation/role_based_navigation.dart';
 import 'package:rapido_app/providers/auth_provider.dart';
 import 'package:rapido_app/providers/ride_provider.dart';
 import 'package:rapido_app/providers/realtime_provider.dart';
+import 'package:rapido_app/providers/admin_provider.dart';
 import 'package:rapido_app/theme/app_theme.dart';
 import 'package:rapido_app/services/notification_service.dart';
 import 'package:rapido_app/services/realtime_service.dart';
@@ -41,6 +42,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => RideProvider()),
         ChangeNotifierProvider(create: (_) => RealtimeProvider()),
+        ChangeNotifierProvider(create: (_) => AdminProvider()),
       ],
       child: MaterialApp(
         title: 'Rapido Corporate',

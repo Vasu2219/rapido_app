@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rapido_app/providers/auth_provider.dart';
+import 'package:rapido_app/providers/admin_provider.dart';
 import 'package:rapido_app/models/user.dart';
+import 'package:rapido_app/models/ride.dart';
+import 'package:intl/intl.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({Key? key}) : super(key: key);
@@ -12,10 +15,23 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _currentIndex = 0;
+  String _selectedFilter = 'All';
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize admin data when screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+      adminProvider.getAllRides();
+      adminProvider.startAutoRefresh();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
+    final adminProvider = Provider.of<AdminProvider>(context);
     final User? user = authProvider.user;
 
     return Scaffold(
@@ -32,6 +48,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ),
         actions: [
+          // Notification Badge
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications, color: Colors.white),
+                onPressed: () {
+                  // Show notifications
+                },
+              ),
+              if (adminProvider.notificationCount > 0)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      '${adminProvider.notificationCount}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.admin_panel_settings, color: Colors.white),
             onSelected: (value) async {
@@ -240,181 +291,334 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildRideManagementTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header with filters
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Ride Management',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              ElevatedButton.icon(
-                onPressed: () {
-                  // Refresh rides
-                },
-                icon: const Icon(Icons.refresh),
-                label: const Text('Refresh'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.deepPurple,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Filter Chips
-          Wrap(
-            spacing: 8,
-            children: [
-              FilterChip(
-                label: const Text('All'),
-                selected: true,
-                onSelected: (selected) {},
-              ),
-              FilterChip(
-                label: const Text('Pending'),
-                selected: false,
-                onSelected: (selected) {},
-              ),
-              FilterChip(
-                label: const Text('Approved'),
-                selected: false,
-                onSelected: (selected) {},
-              ),
-              FilterChip(
-                label: const Text('Completed'),
-                selected: false,
-                onSelected: (selected) {},
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Rides List
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: 10,
-            itemBuilder: (context, index) {
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Ride #${1000 + index}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: index % 3 == 0 
-                                ? Colors.orange.shade100 
-                                : index % 3 == 1 
-                                  ? Colors.green.shade100 
-                                  : Colors.blue.shade100,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              index % 3 == 0 
-                                ? 'Pending' 
-                                : index % 3 == 1 
-                                  ? 'Approved' 
-                                  : 'Completed',
-                              style: TextStyle(
-                                color: index % 3 == 0 
-                                  ? Colors.orange.shade700 
-                                  : index % 3 == 1 
-                                    ? Colors.green.shade700 
-                                    : Colors.blue.shade700,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.person, size: 16, color: Colors.grey),
-                          const SizedBox(width: 4),
-                          Text('Employee EMP00${index + 1}'),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                          const SizedBox(width: 4),
-                          const Expanded(child: Text('Tech Park → Airport')),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(Icons.schedule, size: 16, color: Colors.grey),
-                          const SizedBox(width: 4),
-                          const Text('Today, 10:30 AM'),
-                        ],
-                      ),
-                      if (index % 3 == 0) ...[
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () {
-                                  // Reject ride
-                                },
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.red,
-                                ),
-                                child: const Text('Reject'),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  // Approve ride
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                ),
-                                child: const Text('Approve'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
+    return Consumer<AdminProvider>(
+      builder: (context, adminProvider, child) {
+        if (adminProvider.isLoading && adminProvider.filteredRides.isEmpty) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: () => adminProvider.refreshRides(),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header without refresh button (auto-refresh enabled)
+                Text(
+                  'Ride Management',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              );
-            },
+                
+                const SizedBox(height: 16),
+                
+                // Filter Chips - Working filters
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    FilterChip(
+                      label: const Text('All'),
+                      selected: adminProvider.currentFilter == 'All',
+                      onSelected: (selected) {
+                        if (selected) {
+                          adminProvider.filterRides('All');
+                        }
+                      },
+                    ),
+                    FilterChip(
+                      label: const Text('Pending'),
+                      selected: adminProvider.currentFilter == 'Pending',
+                      onSelected: (selected) {
+                        if (selected) {
+                          adminProvider.filterRides('Pending');
+                        }
+                      },
+                    ),
+                    FilterChip(
+                      label: const Text('Approved'),
+                      selected: adminProvider.currentFilter == 'Approved',
+                      onSelected: (selected) {
+                        if (selected) {
+                          adminProvider.filterRides('Approved');
+                        }
+                      },
+                    ),
+                    FilterChip(
+                      label: const Text('Completed'),
+                      selected: adminProvider.currentFilter == 'Completed',
+                      onSelected: (selected) {
+                        if (selected) {
+                          adminProvider.filterRides('Completed');
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Error handling
+                if (adminProvider.error != null)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error, color: Colors.red.shade700),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            adminProvider.error!,
+                            style: TextStyle(color: Colors.red.shade700),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => adminProvider.clearError(),
+                        ),
+                      ],
+                    ),
+                  ),
+                
+                // Real Rides List
+                adminProvider.filteredRides.isEmpty
+                  ? Center(
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 32),
+                          Icon(
+                            Icons.inbox,
+                            size: 64,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No rides found',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            adminProvider.currentFilter == 'All'
+                              ? 'No rides have been booked yet'
+                              : 'No ${adminProvider.currentFilter.toLowerCase()} rides found',
+                            style: TextStyle(
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: adminProvider.filteredRides.length,
+                      itemBuilder: (context, index) {
+                        final ride = adminProvider.filteredRides[index];
+                        return _buildRideCard(ride, adminProvider);
+                      },
+                    ),
+              ],
+            ),
           ),
-        ],
+        );
+      },
+    );
+  }
+
+  Widget _buildRideCard(Ride ride, AdminProvider adminProvider) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Ride #${ride.id.substring(ride.id.length - 6)}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(ride.status),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    ride.status.toUpperCase(),
+                    style: TextStyle(
+                      color: _getStatusTextColor(ride.status),
+                      fontWeight: FontWeight.w500,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.person, size: 16, color: Colors.grey),
+                const SizedBox(width: 4),
+                Text(
+                  ride.userDetails != null 
+                    ? '${ride.userDetails!['firstName']} ${ride.userDetails!['lastName']} (${ride.userDetails!['employeeId']})'
+                    : 'User ID: ${ride.userId.substring(0, 8)}...',
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text('${ride.pickupLocation} → ${ride.dropLocation}'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(Icons.schedule, size: 16, color: Colors.grey),
+                const SizedBox(width: 4),
+                Text(DateFormat('MMM dd, yyyy - HH:mm').format(ride.scheduledTime)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(Icons.currency_rupee, size: 16, color: Colors.grey),
+                const SizedBox(width: 4),
+                Text('₹${ride.estimatedFare.toStringAsFixed(0)}'),
+              ],
+            ),
+            if (ride.status.toLowerCase() == 'pending') ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _rejectRide(ride.id, adminProvider),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                      ),
+                      child: const Text('Reject'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => _approveRide(ride.id, adminProvider),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Approve'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
       ),
     );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Colors.orange.shade100;
+      case 'approved':
+        return Colors.green.shade100;
+      case 'completed':
+        return Colors.blue.shade100;
+      case 'rejected':
+        return Colors.red.shade100;
+      case 'cancelled':
+        return Colors.grey.shade100;
+      default:
+        return Colors.grey.shade100;
+    }
+  }
+
+  Color _getStatusTextColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Colors.orange.shade700;
+      case 'approved':
+        return Colors.green.shade700;
+      case 'completed':
+        return Colors.blue.shade700;
+      case 'rejected':
+        return Colors.red.shade700;
+      case 'cancelled':
+        return Colors.grey.shade700;
+      default:
+        return Colors.grey.shade700;
+    }
+  }
+
+  Future<void> _approveRide(String rideId, AdminProvider adminProvider) async {
+    final success = await adminProvider.approveRide(rideId, comments: 'Approved by admin');
+    
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ride approved successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to approve ride: ${adminProvider.error}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _rejectRide(String rideId, AdminProvider adminProvider) async {
+    final success = await adminProvider.rejectRide(
+      rideId, 
+      reason: 'Not approved by admin',
+      comments: 'Rejected by admin'
+    );
+    
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ride rejected successfully!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to reject ride: ${adminProvider.error}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Widget _buildUserManagementTab() {

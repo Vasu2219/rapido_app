@@ -59,9 +59,9 @@ class _BookRideScreenState extends State<BookRideScreen> {
       final rideProvider = Provider.of<RideProvider>(context, listen: false);
       
       final rideData = {
-        'pickupLocation': _pickupController.text.trim(),
-        'dropLocation': _dropController.text.trim(),
-        'scheduledTime': _scheduledTime.toIso8601String(),
+        'pickup': _pickupController.text.trim(),
+        'drop': _dropController.text.trim(),
+        'scheduleTime': _scheduledTime.toIso8601String(),
         'rideType': _selectedRideType,
       };
 
