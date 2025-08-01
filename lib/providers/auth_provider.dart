@@ -9,12 +9,14 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   bool _isAuthenticated = false;
+  String? _token;
 
   // Getters
   User? get user => _user;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isAuthenticated => _isAuthenticated;
+  String? get token => _token;
 
   // Initialize - check if user is already logged in
   Future<void> initialize() async {
@@ -22,6 +24,8 @@ class AuthProvider extends ChangeNotifier {
     try {
       _user = await _apiService.getUserProfile();
       _isAuthenticated = true;
+      // Get token from secure storage or API service
+      _token = await _apiService.getStoredToken();
     } catch (e) {
       _isAuthenticated = false;
     } finally {
@@ -41,6 +45,7 @@ class AuthProvider extends ChangeNotifier {
       print('📋 AuthProvider: Got response: $response');
       
       _user = User.fromJson(response['data']['user']);
+      _token = response['data']['token'];
       _isAuthenticated = true;
       print('✅ AuthProvider: Login successful, user set');
       notifyListeners();
@@ -62,7 +67,8 @@ class AuthProvider extends ChangeNotifier {
     _error = null;
 
     try {
-      await _apiService.register(userData);
+      final response = await _apiService.register(userData);
+      _token = response['data']['token'];
       notifyListeners();
       return true;
     } catch (e) {
@@ -99,6 +105,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       await _apiService.logout();
       _user = null;
+      _token = null;
       _isAuthenticated = false;
     } catch (e) {
       _error = e.toString();

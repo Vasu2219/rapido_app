@@ -28,7 +28,7 @@ class ApiService {
     return headers;
   }
   
-  // Login - Updated to handle current backend response
+  // Login - Updated to handle real backend response
   Future<Map<String, dynamic>> login(String email, String password) async {
     try {
       print('🔍 API Service: Starting login process...');
@@ -49,53 +49,14 @@ class ApiService {
       
       final data = jsonDecode(response.body);
       
-      if (response.statusCode == 200) {
-        // Check if we got the proper response with token and user data
-        if (data.containsKey('data') && 
-            data['data'] != null && 
-            data['data'].containsKey('token') && 
-            data['data'].containsKey('user')) {
-          print('✅ Got proper login response with token and user');
-          // Save token
-          await storage.write(key: 'auth_token', value: data['data']['token']);
-          // Save user data
-          await storage.write(key: 'user_data', value: jsonEncode(data['data']['user']));
-          return data;
-        } 
-        // Handle the current backend response format - create mock response
-        else if (data.containsKey('message') && data['message'] == 'Login endpoint working') {
-          print('🔧 Backend returned placeholder response, creating mock login for testing...');
-          
-          // Create a mock successful response for testing purposes
-          final mockResponse = {
-            'success': true,
-            'message': 'Login successful',
-            'data': {
-              'token': 'mock_jwt_token_${DateTime.now().millisecondsSinceEpoch}',
-              'user': {
-                '_id': 'mock_admin_id',
-                'firstName': 'Admin',
-                'lastName': 'User',
-                'email': email,
-                'phone': '9999999999',
-                'employeeId': 'ADMIN001',
-                'department': 'Operations',
-                'role': 'admin',
-                'isActive': true,
-                'createdAt': DateTime.now().toIso8601String(),
-                'updatedAt': DateTime.now().toIso8601String(),
-              }
-            }
-          };
-          
-          // Save mock token and user data
-          final tokenData = mockResponse['data'] as Map<String, dynamic>;
-          await storage.write(key: 'auth_token', value: tokenData['token'] as String);
-          await storage.write(key: 'user_data', value: jsonEncode(tokenData['user']));
-          
-          print('✅ Mock login successful - saved token and user data');
-          return mockResponse;
-        }
+      if (response.statusCode == 200 && data['success'] == true) {
+        // Real login response with token and user data
+        print('✅ Real login successful - saving token and user data');
+        // Save token
+        await storage.write(key: 'auth_token', value: data['data']['token']);
+        // Save user data
+        await storage.write(key: 'user_data', value: jsonEncode(data['data']['user']));
+        return data;
       }
       
       throw Exception(data['message'] ?? 'Login failed');
@@ -129,6 +90,11 @@ class ApiService {
       return User.fromJson(jsonDecode(userData));
     }
     throw Exception('User data not found');
+  }
+
+  // Get stored token
+  Future<String?> getStoredToken() async {
+    return await storage.read(key: 'auth_token');
   }
   
   // Update profile
@@ -169,20 +135,29 @@ class ApiService {
   
   // Get user rides
   Future<List<Ride>> getUserRides() async {
-    final user = await getUserProfile();
-    
-    final response = await http.get(
-      Uri.parse('$baseUrl/api/rides/user/${user.id}'),
-      headers: await _getHeaders(),
-    );
-    
-    final data = jsonDecode(response.body);
-    
-    if (response.statusCode == 200 && data['success'] == true) {
-      final rides = data['data']['rides'] as List;
-      return rides.map((ride) => Ride.fromJson(ride)).toList();
-    } else {
-      throw Exception(data['message'] ?? 'Failed to get rides');
+    try {
+      print('🔍 Getting user rides...');
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/rides'), // Use the correct endpoint
+        headers: await _getHeaders(),
+      );
+      
+      print('📊 User rides response status: ${response.statusCode}');
+      print('📝 User rides response body: ${response.body}');
+      
+      final data = jsonDecode(response.body);
+      
+      if (response.statusCode == 200 && data['success'] == true) {
+        final rides = data['data']['rides'] as List;
+        print('✅ Retrieved ${rides.length} rides');
+        return rides.map((ride) => Ride.fromJson(ride)).toList();
+      } else {
+        throw Exception(data['message'] ?? 'Failed to get rides');
+      }
+    } catch (e) {
+      print('💥 Error getting user rides: $e');
+      rethrow;
     }
   }
   

@@ -76,8 +76,8 @@ class ApiService {
             }
           };
           
-          await storage.write(key: 'auth_token', value: mockResponse['data']['token']);
-          await storage.write(key: 'user_data', value: jsonEncode(mockResponse['data']['user']));
+          await storage.write(key: 'auth_token', value: (mockResponse['data'] as Map<String, dynamic>)['token']);
+          await storage.write(key: 'user_data', value: jsonEncode((mockResponse['data'] as Map<String, dynamic>)['user']));
           return mockResponse;
         }
       }

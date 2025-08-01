@@ -50,6 +50,11 @@ class RideProvider extends ChangeNotifier {
     }
   }
 
+  // Create a ride (alias for bookRide)
+  Future<bool> createRide(Map<String, dynamic> rideData) async {
+    return await bookRide(rideData);
+  }
+
   // Helper method to set loading state
   void _setLoading(bool value) {
     _isLoading = value;

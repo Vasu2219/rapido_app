@@ -32,7 +32,23 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (success && mounted) {
-        Navigator.of(context).pushReplacementNamed('/home');
+        print('✅ Login successful! User: ${authProvider.user}');
+        print('✅ User role: ${authProvider.user?.role}');
+        
+        // Navigate based on user role
+        final userRole = authProvider.user?.role.toLowerCase() ?? '';
+        print('✅ Routing user based on role: $userRole');
+        
+        if (userRole == 'admin') {
+          print('✅ Navigating to admin dashboard');
+          Navigator.of(context).pushReplacementNamed('/admin');
+        } else if (userRole == 'user' || userRole == 'employee') {
+          print('✅ Navigating to user dashboard');
+          Navigator.of(context).pushReplacementNamed('/user');
+        } else {
+          print('✅ Unknown role, navigating to default dashboard');
+          Navigator.of(context).pushReplacementNamed('/dashboard');
+        }
       }
     }
   }

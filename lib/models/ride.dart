@@ -8,6 +8,10 @@ class Ride {
   final double estimatedFare;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final Map<String, dynamic>? driver;
+
+  // Getter for scheduleTime (alias for scheduledTime)
+  DateTime get scheduleTime => scheduledTime;
 
   Ride({
     required this.id,
@@ -19,6 +23,7 @@ class Ride {
     required this.estimatedFare,
     required this.createdAt,
     required this.updatedAt,
+    this.driver,
   });
 
   // Factory constructor to create a Ride from JSON
@@ -30,7 +35,9 @@ class Ride {
       dropLocation: json['dropLocation'] ?? '',
       scheduledTime: json['scheduledTime'] != null
           ? DateTime.parse(json['scheduledTime'])
-          : DateTime.now(),
+          : json['scheduleTime'] != null
+              ? DateTime.parse(json['scheduleTime'])
+              : DateTime.now(),
       status: json['status'] ?? 'pending',
       estimatedFare: (json['estimatedFare'] ?? 0).toDouble(),
       createdAt: json['createdAt'] != null
@@ -39,6 +46,7 @@ class Ride {
       updatedAt: json['updatedAt'] != null
           ? DateTime.parse(json['updatedAt'])
           : DateTime.now(),
+      driver: json['driver'],
     );
   }
 
@@ -54,6 +62,7 @@ class Ride {
       'estimatedFare': estimatedFare,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      'driver': driver,
     };
   }
 

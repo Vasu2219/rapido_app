@@ -1,9 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:rapido_app/providers/auth_provider.dart';
-import 'package:rapido_app/providers/ride_provider.dart';
-import 'package:rapido_app/models/user.dart';
-import 'package:rapido_app/screens/connection_test_screen.dart';
+import 'package:rapido_app/providers/realtime_provider.dart';
+import 'package:rapido_app/theme/app_theme.dart';
+import 'package:rapido_app/widgets/service_card.dart';
+import 'package:rapido_app/widgets/promotional_banner.dart';
+import 'package:rapido_app/widgets/recent_destination_card.dart';
+import 'package:rapido_app/widgets/connection_status_bar.dart';
+import 'package:rapido_app/screens/ride_booking_screen.dart';
+import 'package:rapido_app/screens/services_screen.dart';
+import 'package:rapido_app/screens/activity_screen.dart';
+import 'package:rapido_app/screens/account_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -12,282 +19,369 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  int _currentIndex = 0;
-  final TextEditingController _searchController = TextEditingController();
-  
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+  late AnimationController _fadeController;
+  late AnimationController _slideController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
   @override
   void initState() {
     super.initState();
-    // Load user rides when screen initializes
+    
+    // Initialize animations
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    
+    _slideController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeInOut,
+    ));
+    
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeOutCubic,
+    ));
+    
+    // Start animations
+    _fadeController.forward();
+    _slideController.forward();
+    
+    // Connect to real-time service
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<RideProvider>(context, listen: false).getUserRides();
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final realtimeProvider = Provider.of<RealtimeProvider>(context, listen: false);
+      
+      if (authProvider.isAuthenticated && authProvider.token != null) {
+        realtimeProvider.connect(token: authProvider.token);
+        realtimeProvider.subscribeToUser(authProvider.user?.id ?? '');
+      }
     });
   }
-  
+
   @override
   void dispose() {
-    _searchController.dispose();
+    _fadeController.dispose();
+    _slideController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-    final rideProvider = Provider.of<RideProvider>(context);
-    final User? user = authProvider.user;
-    
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.background,
-        elevation: 0,
-        title: Text(
+      backgroundColor: AppTheme.backgroundColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Connection Status Bar
+            const ConnectionStatusBar(),
+            
+            // Main Content
+            Expanded(
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // App Header
+                        _buildAppHeader(),
+                        const SizedBox(height: 24),
+                        
+                        // Search Bar
+                        _buildSearchBar(),
+                        const SizedBox(height: 16),
+                        
+                        // Recent Destination
+                        const RecentDestinationCard(),
+                        const SizedBox(height: 24),
+                        
+                        // Services Section
+                        _buildServicesSection(),
+                        const SizedBox(height: 24),
+                        
+                        // Promotional Banner
+                        const PromotionalBanner(),
+                        const SizedBox(height: 24),
+                        
+                        // Plan Your Next Trip Section
+                        _buildPlanNextTripSection(),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
+
+  Widget _buildAppHeader() {
+    return Row(
+      children: [
+        Text(
           'Rapido',
-          style: TextStyle(
+          style: Theme.of(context).textTheme.displayLarge?.copyWith(
             fontSize: 28,
             fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.onBackground,
+            color: AppTheme.textColor,
           ),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.bug_report,
-              color: Colors.orange,
-              size: 24,
-            ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ConnectionTestScreen(),
+        const Spacer(),
+        Consumer<AuthProvider>(
+          builder: (context, authProvider, child) {
+            return CircleAvatar(
+              radius: 20,
+              backgroundColor: AppTheme.cardColor,
+              child: Text(
+                authProvider.user?.firstName?.substring(0, 1).toUpperCase() ?? 'U',
+                style: const TextStyle(
+                  color: AppTheme.textColor,
+                  fontWeight: FontWeight.bold,
                 ),
-              );
-            },
-            tooltip: 'Test API Connection',
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        color: AppTheme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.dividerColor, width: 1),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(width: 16),
+          const Icon(
+            Icons.search,
+            color: AppTheme.secondaryTextColor,
+            size: 24,
           ),
-          IconButton(
-            icon: Icon(
-              Icons.account_circle,
-              color: Theme.of(context).colorScheme.onBackground,
-              size: 28,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Where to?',
+              style: TextStyle(
+                color: AppTheme.secondaryTextColor,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-            onPressed: () {
-              // Navigate to profile screen
-              // TODO: Implement profile screen navigation
-            },
+          ),
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppTheme.backgroundColor,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.schedule,
+                  color: AppTheme.secondaryTextColor,
+                  size: 16,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Later',
+                  style: TextStyle(
+                    color: AppTheme.secondaryTextColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Search Bar
-              Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Where to?',
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                          hintStyle: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Container(
-                      margin: const EdgeInsets.all(5),
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.calendar_today,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                        onPressed: () {
-                          // Show date picker for scheduling
-                        },
-                        tooltip: 'Later',
-                      ),
-                    ),
-                  ],
+    );
+  }
+
+  Widget _buildServicesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Suggestions',
+              style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                color: AppTheme.textColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ServicesScreen()),
+                );
+              },
+              child: Text(
+                'See all',
+                style: TextStyle(
+                  color: AppTheme.accentColor,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              
-              const SizedBox(height: 24),
-              
-              // Suggestions Section
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Suggestions',
-                    style: Theme.of(context).textTheme.displaySmall,
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      // View all suggestions
-                    },
-                    child: const Text('See all'),
-                  ),
-                ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: ServiceCard(
+                title: 'Trip',
+                icon: Icons.directions_car,
+                color: Colors.green,
+                hasPromo: true,
+                onTap: () => _navigateToRideBooking('trip'),
               ),
-              
-              const SizedBox(height: 16),
-              
-              // Ride Options
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildRideOption(
-                    context: context,
-                    title: 'Trip',
-                    icon: Icons.directions_car,
-                    isPromo: true,
-                    onTap: () {
-                      // Book a trip
-                    },
-                  ),
-                  _buildRideOption(
-                    context: context,
-                    title: 'Auto',
-                    icon: Icons.electric_rickshaw,
-                    onTap: () {
-                      // Book an auto
-                    },
-                  ),
-                  _buildRideOption(
-                    context: context,
-                    title: 'Moto',
-                    icon: Icons.motorcycle,
-                    onTap: () {
-                      // Book a motorcycle
-                    },
-                  ),
-                ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ServiceCard(
+                title: 'Intercity',
+                icon: Icons.flight,
+                color: Colors.blue,
+                hasPromo: true,
+                onTap: () => _navigateToRideBooking('intercity'),
               ),
-              
-              const SizedBox(height: 24),
-              
-              // Commute Smarter Section
-              Text(
-                'Commute smarter',
-                style: Theme.of(context).textTheme.displaySmall,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: ServiceCard(
+                title: 'Reserve',
+                icon: Icons.schedule,
+                color: Colors.orange,
+                onTap: () => _navigateToRideBooking('reserve'),
               ),
-              
-              const SizedBox(height: 16),
-              
-              // Commute Options
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildCommuteOption(
-                      context: context,
-                      title: 'Go with Rapido Auto',
-                      description: 'Doorstep pick-up, no bargaining',
-                      icon: Icons.electric_rickshaw,
-                      onTap: () {
-                        // Book an auto
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildCommuteOption(
-                      context: context,
-                      title: 'Hop on Rapido Moto',
-                      description: 'Move through traffic faster',
-                      icon: Icons.motorcycle,
-                      onTap: () {
-                        // Book a motorcycle
-                      },
-                    ),
-                  ),
-                ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ServiceCard(
+                title: 'Rentals',
+                icon: Icons.access_time,
+                color: Colors.purple,
+                onTap: () => _navigateToRideBooking('rentals'),
               ),
-              
-              const SizedBox(height: 24),
-              
-              // Save Every Day Section
-              Text(
-                'Save every day',
-                style: Theme.of(context).textTheme.displaySmall,
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Recent Rides or Promotions
-              if (rideProvider.isLoading)
-                const Center(child: CircularProgressIndicator())
-              else if (rideProvider.error != null)
-                Center(
-                  child: Text(
-                    'Failed to load rides: ${rideProvider.error}',
-                    style: TextStyle(color: Colors.red),
-                  ),
-                )
-              else if (rideProvider.rides.isEmpty)
-                Center(
-                  child: Text(
-                    'No recent rides found',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
-                    ),
-                  ),
-                )
-              else
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: rideProvider.rides.length > 2 ? 2 : rideProvider.rides.length,
-                  itemBuilder: (context, index) {
-                    final ride = rideProvider.rides[index];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: ListTile(
-                        leading: Icon(
-                          ride.status.toLowerCase() == 'completed' 
-                              ? Icons.check_circle 
-                              : Icons.pending,
-                          color: Color(int.parse(ride.getStatusColor().replaceAll('#', '0xFF'))),
-                        ),
-                        title: Text(ride.dropLocation),
-                        subtitle: Text(
-                          '${ride.status} • ₹${ride.estimatedFare.toStringAsFixed(2)}',
-                        ),
-                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                        onTap: () {
-                          // View ride details
-                        },
-                      ),
-                    );
-                  },
-                ),
-            ],
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPlanNextTripSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Plan your next trip',
+          style: Theme.of(context).textTheme.displaySmall?.copyWith(
+            color: AppTheme.textColor,
+            fontWeight: FontWeight.w600,
           ),
         ),
+        const SizedBox(height: 16),
+        Container(
+          height: 80,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Colors.blue, Colors.lightBlue],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Center(
+            child: Text(
+              'Coming Soon',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppTheme.primaryColor,
+        border: Border(
+          top: BorderSide(color: AppTheme.dividerColor, width: 1),
+        ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
+      child: BottomNavigationBar(
+        backgroundColor: Colors.transparent,
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: AppTheme.textColor,
+        unselectedItemColor: AppTheme.secondaryTextColor,
+        elevation: 0,
+        currentIndex: 0, // Home is selected
         onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+          switch (index) {
+            case 0:
+              // Already on home
+              break;
+            case 1:
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ServicesScreen()),
+              );
+              break;
+            case 2:
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ActivityScreen()),
+              );
+              break;
+            case 3:
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AccountScreen()),
+              );
+              break;
+          }
         },
         items: const [
           BottomNavigationBarItem(
@@ -299,7 +393,7 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Services',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.history),
+            icon: Icon(Icons.receipt_long),
             label: 'Activity',
           ),
           BottomNavigationBarItem(
@@ -310,125 +404,12 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-  
-  Widget _buildRideOption({
-    required BuildContext context,
-    required String title,
-    required IconData icon,
-    bool isPromo = false,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 100,
-        height: 100,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Stack(
-          children: [
-            if (isPromo)
-              Positioned(
-                top: 8,
-                left: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.secondary,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    'Promo',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    icon,
-                    size: 32,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildCommuteOption({
-    required BuildContext context,
-    required String title,
-    required String description,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 180,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Center(
-                child: Icon(
-                  icon,
-                  size: 48,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    description,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+
+  void _navigateToRideBooking(String serviceType) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RideBookingScreen(serviceType: serviceType),
       ),
     );
   }
